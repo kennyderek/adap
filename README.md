@@ -6,7 +6,7 @@ We want this project to be accessible to everyone. We use CPUs to train our mode
 ## Set-up (<5 min)
 In your favorite project directory
 ```
-git clone git@github.com:kennyderek/adap.git
+git clone https://github.com/kennyderek/adap.git
 cd adap
 ```
 
