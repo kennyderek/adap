@@ -1,14 +1,9 @@
-# ADAP
-
-## Preliminaries
-
-### Time
-Running the CartPole section of this tutorial, including set-up, training, and evaluation, should hopefully take no more than 10 minutes!
+# [ADAP](https://kennyderek.github.io/adap/)
 
 ### Computation Requirements
 We want this project to be accessible to everyone. We use CPUs to train our models, using the framework called RLLib. In this paper, we used 3 cores and experiments ran under 24 hours.
 
-## Set-up
+## Set-up (<5 min)
 In a virtual environment (we recommend using conda or miniconda e.g. by ```conda create -n adapvenv python=3.8```), install the python module containing Farmworld, Markov Soccer, and the Multi-Goal experiment. This module is called ```adapenvs``` and can be installed by:
 ```
 cd adaptation_envs
@@ -21,15 +16,18 @@ cd adap_policies
 pip install -e .
 ```
 
-## Training
+## Training (< 5 min)
 We should be all set to run our code! Scripts are executed from the ```adap_code/scripts``` directory. To run a simple cartpole experiment using ADAP, we can follow the following steps:
 ```
+cd ..
 cd scripts
-python run.py --conf ../configs/cartpole/adap.yaml --exp-name cartpole
+python run.py --conf ../configs/cartpole/train/adap.yaml --exp-name cartpole
 ```
 ```cartpole/adap.yaml``` is just one possible configuration file, with information regarding the 1) training environment and 2) algorithm hyperparameters. Feel free to make new configuration files by modifying hyperparameters as you wish! Automatically, RLLib will start training and checkpointing the experiment in the directory ```~ray_results/cartpole/[CONFIG_FILE + TIME]```. By default, this will checkpoint the code every 100 epochs, and at the end of training.
 
 ### Visualizing Traing Results
+
+Make sure you are using your virtual env, and that it has the installed ADAP python modules. Visualization should cause a PyGlet window to pop up, and render CartPole. 
 
 To visualize the result, we can run 
 ```
@@ -41,15 +39,16 @@ python run.py --conf ../configs/cartpole/train/adap.yaml --restore ~/ray_results
 ```
 Or, we can train for longer and use a later checkpoint file.
 
-### Evaluation on Ablations
+### Evaluation on Ablations (< 1 min)
 What if we want to search for ADAP policies (via latent distribution optimization) that tend to move towards the right half of our cartpole screen? Let's run the following:
 ```
-python run.py --conf ../configs/cartpole/train/adap.yaml  --evaluate ../configs/cartpole/ablations/move_right.yaml --restore ~/ray_results/cartpole/[CONFIG_FILE + TIME]/checkpoint_000025/checkpoint-25
---evolve
+python run.py --conf ../configs/cartpole/train/adap.yaml --restore ~/ray_results/cartpole/[CONFIG_FILE + TIME]/checkpoint_000025/checkpoint-25 --evaluate ../configs/cartpole/ablations/move_right.yaml --evolve
 ```
 The ```--evaluate``` argument specifies a new environment configuration to use, which replaces the training environment configuration. Here, we have provided ```move_right.yaml```, which modifies the reward function to be r(t) = -x-axis position of the cartpole. The ```--evolve``` flag tells ```run.py``` to 
 
 For CartPole, we optimize the latent space for 30 steps, which is enough to recover policies from our policy space that can move left, or right, consistently. 
+
+Awesome work! You've completed training and latent optimization of a policy space for CartPole!
 
 ## FAQs
 
