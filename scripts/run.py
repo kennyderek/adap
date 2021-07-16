@@ -2,8 +2,6 @@ from adap.latent_optimizer import evolve
 import argparse
 import yaml
 
-from ray import tune
-
 from common import get_env_and_callbacks, get_name_creator, get_trainer, build_trainer_config, get_name_creator
 
 import copy
@@ -13,12 +11,12 @@ parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--exp-name', type=str, default="context_exp")
 parser.add_argument('--local-dir', type=str, default="~/ray_results")
 
-parser.add_argument('--restore', type=str, default="") # path to restore the game
-parser.add_argument('--evaluate', type=str, default="") # path to restore the game
-parser.add_argument('--evolve', action="store_true") # path to restore the game
+parser.add_argument("--conf", type=str, help="path to the config file containing ADAP hyperparameters and environment settings")
 
-parser.add_argument("--train", action="store_true")
-parser.add_argument("--conf", type=str)
+parser.add_argument('--restore', type=str, default="", help="")
+parser.add_argument('--evaluate', type=str, default="", help="path of the config file on which to evaluate a model")
+parser.add_argument('--evolve', action="store_true", help="whether to perform latent optimization")
+parser.add_argument("--train", action="store_true", help="used to continue training a restored model")
 
 
 if __name__ == "__main__":
@@ -45,10 +43,11 @@ if __name__ == "__main__":
     stop = {
         "timesteps_total": training_conf['timesteps_total'],
         "training_iteration": training_conf['training_iteration'],
-        # "episode_reward_mean": 34 # this would mean 35/40 agents have survived on average, and is probably a good stop condition
     }
 
     if args.restore == "":
+        from ray import tune
+
         tune.run(trainer_cls,
             config=trainer_conf,
             stop=stop,
@@ -59,6 +58,8 @@ if __name__ == "__main__":
             trial_dirname_creator=get_name_creator(path), # the name after ~/ray_results/context_exp
         )
     elif args.train:
+        from ray import tune
+
         # pick up where we left off training, using a checkpoint
         tune.run(trainer_cls,
             config=trainer_conf,
