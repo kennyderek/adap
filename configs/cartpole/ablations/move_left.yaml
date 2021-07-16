@@ -1,0 +1,10 @@
+env_conf:
+  action_dist: gaussian
+  context_size: 3
+  discrete_context: false
+  env: Gym
+  game: CartPole-v0
+  max_env_actions: 1
+  mode: cartpole_left
+  noise_scale: 0.0
+  use_context: true

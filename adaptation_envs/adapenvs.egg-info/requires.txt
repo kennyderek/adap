@@ -1,0 +1,4 @@
+gym
+ray
+matplotlib
+tqdm
