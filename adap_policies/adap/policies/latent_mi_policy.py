@@ -237,7 +237,6 @@ def compute_gae_for_sample_batch(
         other_agent_batches: Optional[Dict[AgentID, SampleBatch]] = None,
         episode: Optional[MultiAgentEpisode] = None) -> SampleBatch:
     """Adds GAE (generalized advantage estimations) to a trajectory.
-
     The trajectory contains only data from one episode and from one agent.
     - If  `config.batch_mode=truncate_episodes` (default), sample_batch may
     contain a truncated (at-the-end) episode, in case the
@@ -245,7 +244,6 @@ def compute_gae_for_sample_batch(
     - If `config.batch_mode=complete_episodes`, sample_batch will contain
     exactly one episode (no matter how long).
     New columns can be added to sample_batch and existing ones may be altered.
-
     Args:
         policy (Policy): The Policy used to generate the trajectory
             (`sample_batch`)
@@ -255,20 +253,16 @@ def compute_gae_for_sample_batch(
             same episode). NOTE: The other agents use the same policy.
         episode (Optional[MultiAgentEpisode]): Optional multi-agent episode
             object in which the agents operated.
-
     Returns:
         SampleBatch: The postprocessed, modified SampleBatch (or a new one).
     """
 
-    # print("batch shape:", sample_batch["obs"].shape)
     if policy.config["mi_mode"] in ["state", "state_action_non_diff"]:
         original_obs = restore_original_dimensions(
                 torch.tensor(sample_batch["obs"]),
                 policy.observation_space,
                 tensorlib="torch"
             )
-
-        # print("ORIGINAL OBS SHAPE:", original_obs['obs'].shape)
 
         if policy.config["mi_mode"] == "state":
             mi_obs = original_obs['obs']
@@ -289,17 +283,8 @@ def compute_gae_for_sample_batch(
                 ctx_pred = policy.model.predict_context(mi_obs).data.numpy()
             ctx_target = original_obs['ctx'].data.numpy()
             
-            # rew_mod = -np.mean((ctx_pred - ctx_target)**2, axis=-1)
-
             rew_mod = policy.model.get_rew_mod(ctx_pred, ctx_target)
 
-        # rew_mod = (rew_mod - np.mean(rew_mod)) / (np.std(rew_mod) + 1e-8)
-        # with torch.no_grad():
-        #     action_dist_inputs, _ = policy.model.forward({"obs_flat": torch.tensor(sample_batch["obs"]), "obs": original_obs}, state=None, seq_lens=None)
-        # if policy.config["clip_mi_rewards"] != 0:
-        #     clip_val = policy.config["clip_mi_rewards"]
-        #     sample_batch['rewards'] = sample_batch['rewards'] + np.clip(rew_mod, -clip_val, clip_val)*policy.config['mi_reward_scaling']
-        # else:
         sample_batch['rewards'] = sample_batch['rewards']*policy.config['extrinsic_reward_scaling'] + rew_mod*policy.config['mi_reward_scaling']# + torch.distributions.Categorical(action_dist_inputs).entropy().numpy().flatten()
 
     # Trajectory is actually complete -> last r=0.0.
@@ -311,8 +296,9 @@ def compute_gae_for_sample_batch(
         # requirements. It's a single-timestep (last one in trajectory)
         # input_dict.
         # Create an input dict according to the Model's requirements.
-        input_dict = policy.model.get_input_dict(sample_batch, index="last")
-        last_r = policy._value(**input_dict, seq_lens=input_dict.seq_lens)
+        input_dict = sample_batch.get_single_step_input_dict(
+            policy.model.view_requirements, index="last")
+        last_r = policy._value(**input_dict)
 
     # Adds the policy logits, VF preds, and advantages to the batch,
     # using GAE ("generalized advantage estimation") or not.
@@ -325,6 +311,103 @@ def compute_gae_for_sample_batch(
         use_critic=policy.config.get("use_critic", True))
 
     return batch
+
+# def compute_gae_for_sample_batch(
+#         policy: Policy,
+#         sample_batch: SampleBatch,
+#         other_agent_batches: Optional[Dict[AgentID, SampleBatch]] = None,
+#         episode: Optional[MultiAgentEpisode] = None) -> SampleBatch:
+#     """Adds GAE (generalized advantage estimations) to a trajectory.
+
+#     The trajectory contains only data from one episode and from one agent.
+#     - If  `config.batch_mode=truncate_episodes` (default), sample_batch may
+#     contain a truncated (at-the-end) episode, in case the
+#     `config.rollout_fragment_length` was reached by the sampler.
+#     - If `config.batch_mode=complete_episodes`, sample_batch will contain
+#     exactly one episode (no matter how long).
+#     New columns can be added to sample_batch and existing ones may be altered.
+
+#     Args:
+#         policy (Policy): The Policy used to generate the trajectory
+#             (`sample_batch`)
+#         sample_batch (SampleBatch): The SampleBatch to postprocess.
+#         other_agent_batches (Optional[Dict[PolicyID, SampleBatch]]): Optional
+#             dict of AgentIDs mapping to other agents' trajectory data (from the
+#             same episode). NOTE: The other agents use the same policy.
+#         episode (Optional[MultiAgentEpisode]): Optional multi-agent episode
+#             object in which the agents operated.
+
+#     Returns:
+#         SampleBatch: The postprocessed, modified SampleBatch (or a new one).
+#     """
+
+#     # print("batch shape:", sample_batch["obs"].shape)
+#     if policy.config["mi_mode"] in ["state", "state_action_non_diff"]:
+#         original_obs = restore_original_dimensions(
+#                 torch.tensor(sample_batch["obs"]),
+#                 policy.observation_space,
+#                 tensorlib="torch"
+#             )
+
+#         # print("ORIGINAL OBS SHAPE:", original_obs['obs'].shape)
+
+#         if policy.config["mi_mode"] == "state":
+#             mi_obs = original_obs['obs']
+#         elif policy.config["mi_mode"] == "state_action_non_diff":
+#             # TODO, find a way to just reuse the action dist inputs from the original forward pass
+#             with torch.no_grad():
+#                 action_dist_inputs, _ = policy.model.forward({"obs_flat": torch.tensor(sample_batch["obs"]), "obs": original_obs}, state=None, seq_lens=None)
+#             mi_obs = torch.cat([original_obs['obs'], torch.nn.functional.softmax(action_dist_inputs, dim=-1)], dim=-1)
+
+#         if policy.config["discrete_context"]:
+#             with torch.no_grad():
+#                 ctx_pred = policy.model.predict_context(mi_obs)
+#             dist = Categorical(logits=ctx_pred)
+#             ctx_target = np.argmax(original_obs['ctx'].numpy(), axis=-1) # get the index of each one hot
+#             rew_mod = dist.log_prob(torch.tensor(ctx_target)).numpy() - np.log(1/policy.config['context_size'])
+#         else:
+#             with torch.no_grad():
+#                 ctx_pred = policy.model.predict_context(mi_obs).data.numpy()
+#             ctx_target = original_obs['ctx'].data.numpy()
+            
+#             # rew_mod = -np.mean((ctx_pred - ctx_target)**2, axis=-1)
+
+#             rew_mod = policy.model.get_rew_mod(ctx_pred, ctx_target)
+
+#         # rew_mod = (rew_mod - np.mean(rew_mod)) / (np.std(rew_mod) + 1e-8)
+#         # with torch.no_grad():
+#         #     action_dist_inputs, _ = policy.model.forward({"obs_flat": torch.tensor(sample_batch["obs"]), "obs": original_obs}, state=None, seq_lens=None)
+#         # if policy.config["clip_mi_rewards"] != 0:
+#         #     clip_val = policy.config["clip_mi_rewards"]
+#         #     sample_batch['rewards'] = sample_batch['rewards'] + np.clip(rew_mod, -clip_val, clip_val)*policy.config['mi_reward_scaling']
+#         # else:
+#         sample_batch['rewards'] = sample_batch['rewards']*policy.config['extrinsic_reward_scaling'] + rew_mod*policy.config['mi_reward_scaling']# + torch.distributions.Categorical(action_dist_inputs).entropy().numpy().flatten()
+
+#     print(sample_batch[SampleBatch.DONES])
+#     print(len(sample_batch[SampleBatch.DONES]))
+#     # Trajectory is actually complete -> last r=0.0.
+#     if sample_batch[SampleBatch.DONES][-1]:
+#         last_r = 0.0
+#     # Trajectory has been truncated -> last r=VF estimate of last obs.
+#     else:
+#         # Input dict is provided to us automatically via the Model's
+#         # requirements. It's a single-timestep (last one in trajectory)
+#         # input_dict.
+#         # Create an input dict according to the Model's requirements.
+#         input_dict = policy.model.get_input_dict(sample_batch, index="last")
+#         last_r = policy._value(**input_dict, seq_lens=input_dict.seq_lens)
+
+#     # Adds the policy logits, VF preds, and advantages to the batch,
+#     # using GAE ("generalized advantage estimation") or not.
+#     batch = compute_advantages(
+#         sample_batch,
+#         last_r,
+#         policy.config["gamma"],
+#         policy.config["lambda"],
+#         use_gae=policy.config["use_gae"],
+#         use_critic=policy.config.get("use_critic", True))
+
+#     return batch
 
 # Build a child class of `TorchPolicy`, given the custom functions defined
 # above.

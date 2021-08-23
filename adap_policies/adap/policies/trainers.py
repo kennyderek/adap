@@ -15,6 +15,7 @@ from ray.rllib.policy.policy import Policy
 from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID, SampleBatch
 from ray.rllib.utils.typing import TrainerConfigDict
 from ray.util.iter import LocalIterator
+from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 
 # from utils.simulation import simulate_soccer
 # from adapenvs.markov_soccer.markov_soccer import MarkovSoccer
@@ -68,39 +69,78 @@ class MyCallbacksFarm(DefaultCallbacks):
         self.last_avc = 0
         self.last_attacktropy = 0
     
-    def on_learn_on_batch(self, *, policy: Policy, train_batch: SampleBatch, result: dict, **kwargs) -> None:
-        lifetimes = np.zeros(len(train_batch['infos']))
-        c_t_attacktropies = np.zeros(len(train_batch['infos']))
-        ct_a_attacktropies = np.zeros(len(train_batch['infos']))
-        avt = np.zeros(len(train_batch['infos']))
-        avc = np.zeros(len(train_batch['infos']))
-        ava = np.zeros(len(train_batch['infos']))
-        for i, agent_info_dict in enumerate(train_batch['infos']):
-            lifetimes[i] = agent_info_dict.get('lifetime', np.nan)
-            c_t_attacktropies[i] = agent_info_dict.get('c_t_attacktropy', np.nan)
-            ct_a_attacktropies[i] = agent_info_dict.get('ct_a_attacktropy', np.nan)
-            avt[i] = agent_info_dict.get('avt', np.nan)
-            avc[i] = agent_info_dict.get('avc', np.nan)
-            ava[i] = agent_info_dict.get('ava', np.nan)
+    # def on_learn_on_batch(self, *, policy: Policy, train_batch: SampleBatch, result: dict, **kwargs) -> None:
+    #     lifetimes = np.zeros(len(train_batch['infos']))
+    #     c_t_attacktropies = np.zeros(len(train_batch['infos']))
+    #     ct_a_attacktropies = np.zeros(len(train_batch['infos']))
+    #     avt = np.zeros(len(train_batch['infos']))
+    #     avc = np.zeros(len(train_batch['infos']))
+    #     ava = np.zeros(len(train_batch['infos']))
+    #     for i, agent_info_dict in enumerate(train_batch['infos']):
+    #         lifetimes[i] = agent_info_dict.get('lifetime', np.nan)
+    #         c_t_attacktropies[i] = agent_info_dict.get('c_t_attacktropy', np.nan)
+    #         ct_a_attacktropies[i] = agent_info_dict.get('ct_a_attacktropy', np.nan)
+    #         avt[i] = agent_info_dict.get('avt', np.nan)
+    #         avc[i] = agent_info_dict.get('avc', np.nan)
+    #         ava[i] = agent_info_dict.get('ava', np.nan)
 
-        a = np.mean(lifetimes[~np.isnan(lifetimes)])
-        b = np.mean(c_t_attacktropies[~np.isnan(c_t_attacktropies)])
-        ct_a = np.mean(ct_a_attacktropies[~np.isnan(ct_a_attacktropies)])
-        c = np.mean(avt[~np.isnan(avt)])
-        d = np.mean(avc[~np.isnan(avc)])
-        e = np.mean(ava[~np.isnan(ava)])
-        if not np.isnan(a):
-            result['avg_agent_lifetime'] = a
-        if not np.isnan(b):
-            result['avg_c_t_attacktropy'] = b
-        if not np.isnan(ct_a):
-            result['avg_ct_a_attacktropy'] = ct_a
-        if not np.isnan(c):
-            result['avt'] = c
-        if not np.isnan(d):
-            result['avc'] = d
-        if not np.isnan(e):
-            result['ava'] = e
+    #     a = np.mean(lifetimes[~np.isnan(lifetimes)])
+    #     b = np.mean(c_t_attacktropies[~np.isnan(c_t_attacktropies)])
+    #     ct_a = np.mean(ct_a_attacktropies[~np.isnan(ct_a_attacktropies)])
+    #     c = np.mean(avt[~np.isnan(avt)])
+    #     d = np.mean(avc[~np.isnan(avc)])
+    #     e = np.mean(ava[~np.isnan(ava)])
+    #     if not np.isnan(a):
+    #         result['avg_agent_lifetime'] = a
+    #     if not np.isnan(b):
+    #         result['avg_c_t_attacktropy'] = b
+    #     if not np.isnan(ct_a):
+    #         result['avg_ct_a_attacktropy'] = ct_a
+    #     if not np.isnan(c):
+    #         result['avt'] = c
+    #     if not np.isnan(d):
+    #         result['avc'] = d
+    #     if not np.isnan(e):
+    #         result['ava'] = e
+
+    def on_episode_start(self, *, worker: RolloutWorker, base_env,
+                         policies,
+                         episode: MultiAgentEpisode, env_index: int, **kwargs):
+        # Make sure this episode has just been started (only initial obs
+        # logged so far).
+        assert episode.length == 0, \
+            "ERROR: `on_episode_start()` callback should be called right " \
+            "after env reset!"
+        # print("episode {} (env-idx={}) started.".format(
+            # episode.episode_id, env_index))
+        episode.user_data["avt"] = []
+        episode.user_data['avc'] = []
+        episode.user_data['c_t_attacktropy'] = []
+
+    def on_episode_step(self, *, worker, base_env,
+                        episode, env_index: int, **kwargs):
+        # Make sure this episode is ongoing.
+        assert episode.length > 0, \
+            "ERROR: `on_episode_step()` callback should not be called right " \
+            "after env reset!"
+        for agent_id, _ in episode.agent_rewards:
+            info = episode.last_info_for(agent_id)
+            if info != None and 'avt' in info:
+                episode.user_data['avt'].append(info['avt'])
+            if info != None and 'avc' in info:
+                episode.user_data['avc'].append(info['avc'])
+            if info != None and 'c_t_attacktropy' in info:
+                episode.user_data['c_t_attacktropy'].append(info['c_t_attacktropy'])
+
+    def on_episode_end(self, *, worker: "RolloutWorker", base_env, policies, episode, env_index, **kwargs) -> None:
+        # return super().on_episode_end(worker, base_env, policies, episode, env_index=env_index, **kwargs)
+        assert episode.batch_builder.policy_collectors[
+            "policy_1"].buffers["dones"][-1], \
+            "ERROR: `on_episode_end()` should only be called " \
+            "after episode is done!"
+        episode.custom_metrics['avt'] = np.mean(episode.user_data['avt'])
+        episode.custom_metrics['avc'] = np.mean(episode.user_data['avc'])
+        episode.custom_metrics['c_t_attacktropy'] = np.mean(episode.user_data['c_t_attacktropy'])
 
 def execution_plan_maker(standardize_adv = False):
     def execution_plan(workers: WorkerSet,

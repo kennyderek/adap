@@ -76,6 +76,9 @@ class BaseModel(TorchModelV2, nn.Module):
             self.rew_mod_sig = nn.Parameter(th.tensor(1.0), requires_grad=True)
             self.mi_decider = CtxDiscrim(self.get_input_size_excluding_ctx() + self.num_outputs, self.hidden_dim, self.context_size)
 
+    def get_input_dict(self, sample_batch, index):
+        return super().get_input_dict(sample_batch, index=index)
+
     def get_input_size_inluding_ctx(self):
         assert False, "must override!"
 

@@ -1,0 +1,6 @@
+hidden_dim: 64
+timesteps_total: 6_000_000
+training_iteration: 10_000
+
+entropy_coeff: 0.0
+trainer: PPO

@@ -1,0 +1,11 @@
+hidden_dim: 64
+timesteps_total: 6_000_000
+training_iteration: 10_000
+
+context_loss_coeff: 1 # 1 is fine, since this updates the discrim network, which is separate
+entropy_coeff: 0.05
+extrinsic_reward_scaling: 1
+mi_reward_scaling: 0.1
+mi_mode: state
+trainer: MIPPO
+use_mi_discrim: true

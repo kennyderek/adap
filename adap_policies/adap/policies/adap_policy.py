@@ -2,14 +2,14 @@
 PyTorch policy class used for PPO.
 """
 import logging
-from typing import Dict, List, Type, Union
+from typing import Dict, List, Type, Union, Optional
 
 import gym
 import numpy as np
 import ray
 from ray.rllib.agents.ppo.ppo_tf_policy import setup_config
 from ray.rllib.evaluation.postprocessing import (Postprocessing,
-                                                 compute_gae_for_sample_batch)
+                                                 compute_gae_for_sample_batch, compute_advantages)
 from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
 from ray.rllib.policy.policy import Policy
@@ -21,9 +21,10 @@ from ray.rllib.utils.framework import try_import_torch
 from ray.rllib.utils.torch_ops import (apply_grad_clipping,
                                        convert_to_torch_tensor,
                                        explained_variance, sequence_mask)
-from ray.rllib.utils.typing import TensorType, TrainerConfigDict
+from ray.rllib.utils.typing import TensorType, TrainerConfigDict, AgentID
 from ray.rllib.utils.schedules import ConstantSchedule, PiecewiseSchedule
 from ray.rllib.utils.annotations import override, DeveloperAPI
+from ray.rllib.evaluation.episode import MultiAgentEpisode
 
 torch, nn = try_import_torch()
 

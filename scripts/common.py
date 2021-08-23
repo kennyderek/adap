@@ -25,7 +25,7 @@ from ray.rllib.policy.torch_policy_template import build_torch_policy
 
 from datetime import datetime
 
-from adap.latent_optimizer import set_latent_gym
+from adap.latent_optimizer import set_latent_farmworld, set_latent_gym
 
 from adap.models.concat_model import ConcatModel
 from adap.models.mult_model import MultModel
@@ -36,13 +36,13 @@ ModelCatalog.register_custom_model(
     "ContextMult", MultModel)
 
 
-def get_name_creator(path):
+def get_name_creator(path, name=""):
     def name_creator(trial):
-        name = path[-1].replace(".yaml", "") + \
-            datetime.now().strftime("_%d_%H_%M_%S")
+        if name == "":
+            return path[-1].replace(".yaml", "") + \
+                datetime.now().strftime("_%d_%H_%M_%S")
         return name
     return name_creator
-
 
 def get_trainer(args_trainer):
     if args_trainer == "PPO":
@@ -69,7 +69,7 @@ def get_trainer(args_trainer):
 
 def get_env_and_callbacks(env_name):
     if env_name == "Farmworld":
-        return Farmworld, MyCallbacksFarm, step_farm_with_context
+        return Farmworld, MyCallbacksFarm, step_farm_with_context, set_latent_farmworld
     if env_name == "Field":
         return Field, MyCallbacksField, simulate_field_with_context
     if env_name == "MarkovSoccer":
@@ -98,17 +98,17 @@ def build_trainer_config(env_class,
                 "use_mi_discrim": trainer_conf.get('use_mi_discrim', False),
                 "mi_mode": trainer_conf.get("mi_mode", None),
                 "lstm_state_size": trainer_conf.get('lstm_state_size', 0),
-                "value_nonlinearity": trainer_conf.get('value_nonlinearity', 'Tanh'),
+                "value_nonlinearity": trainer_conf.get('value_nonlinearity', 'ReLU'),
                 "clamp_mu_logits": trainer_conf.get('clamp_mu_logits', False),
             }
         }
 
     policy_config = {
         "model": model_config,
-        "count_steps_by": trainer_conf['count_steps_by'],  # or env_steps
-        "rollout_fragment_length": trainer_conf['rollout_fragment_length'],
+        "count_steps_by": trainer_conf.get('count_steps_by', 'agent_steps'),  # or env_steps
+        "rollout_fragment_length": trainer_conf.get('rollout_fragment_length', env_conf["eps_length"]+2),
 
-        "vf_loss_coeff": trainer_conf['vf_loss_coeff'],
+        "vf_loss_coeff": trainer_conf.get('vf_loss_coeff', 1), # 1 is fine, since we are using separate policy and value networks
         "entropy_coeff": trainer_conf['entropy_coeff'],
 
         "context_loss_coeff": trainer_conf.get('context_loss_coeff', 0),
@@ -146,24 +146,23 @@ def build_trainer_config(env_class,
                 # the first tuple value is None -> uses default policy
                 "policy_1": (None, obs_space, act_space, policy_config),
             },
-            "batch_mode": trainer_conf['batch_mode'],
-            # "batch_mode": "truncate_episodes" if trainer == "ContextFlex" else "complete_episodes",
-            "rollout_fragment_length": trainer_conf['rollout_fragment_length'],
-            "count_steps_by": trainer_conf['count_steps_by'],  # or env_steps
+            "batch_mode": trainer_conf.get('batch_mode', "complete_episodes"),
+            "rollout_fragment_length": trainer_conf.get('rollout_fragment_length', env_conf["eps_length"]+2),
+            "count_steps_by": trainer_conf.get('count_steps_by', 'agent_steps'),  # or env_steps
             "policy_mapping_fn": lambda agent_id: "policy_1"
         },
 
-        "rollout_fragment_length": trainer_conf['rollout_fragment_length'],
+        "rollout_fragment_length": trainer_conf.get('rollout_fragment_length', env_conf["eps_length"]+2),
 
         "lambda": trainer_conf.get('lambda', 0.95),
         "gamma": trainer_conf.get('gamma', 0.99),  # discount factor on the MDP
         "clip_param": 0.2,
         "grad_clip": None if trainer_conf.get('grad_clip', 0.5) == "None" else trainer_conf.get('grad_clip', 0.5),
-        "lr": trainer_conf['lr'],
+        "lr": trainer_conf.get('lr', 3e-4),
 
-        "train_batch_size": trainer_conf['train_batch_size'],
-        "sgd_minibatch_size": trainer_conf['sgd_minibatch_size'],
-        "num_sgd_iter": 10,
+        "train_batch_size": trainer_conf.get('train_batch_size', 4000),
+        "sgd_minibatch_size": trainer_conf.get('sgd_minibatch_size', 2000),
+        "num_sgd_iter": trainer_conf.get("num_sgd_iter", 10),
 
         "framework": "torch",
         "num_workers": 2,
