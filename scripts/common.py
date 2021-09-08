@@ -1,7 +1,5 @@
 from os import name
-from adapenvs.farmworld.farmworld import Farmworld
-from adapenvs.field.field import Field
-from adapenvs.markov_soccer.markov_soccer import MarkovSoccer
+
 from adapenvs.gym_wrapper.gym_wrapper import GymWrapper
 
 from adapenvs.simulators.simulation import simulate_field_with_context, step_farm_with_context, simulate_gym
@@ -68,12 +66,6 @@ def get_trainer(args_trainer):
 
 
 def get_env_and_callbacks(env_name):
-    if env_name == "Farmworld":
-        return Farmworld, MyCallbacksFarm, step_farm_with_context
-    if env_name == "Field":
-        return Field, MyCallbacksField, simulate_field_with_context
-    if env_name == "MarkovSoccer":
-        return MarkovSoccer, MyCallbacksSoccer, None
     if env_name == "Gym":
         return GymWrapper, DefaultCallbacks, simulate_gym, set_latent_gym
     else:
