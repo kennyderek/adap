@@ -114,10 +114,15 @@ def evaluate_on_ablation(agent,
                          img_size=200):
     with open(ablation_env_conf_path, 'r') as f:
         env_conf = yaml.load(f)
-    best = try_adaptation(lambda a: agent, Env(env_conf), env_conf, steps=eval_steps)
-    env = Env(env_conf)
-    for agent_id, fn in best.items():
-        env.set_sampler_fn(agent_id, fn)
+    
+    env = None
+    if eval_steps > 0:
+        best = try_adaptation(lambda a: agent, Env(env_conf), env_conf, steps=eval_steps)
+        env = Env(env_conf)
+        for agent_id, fn in best.items():
+            env.set_sampler_fn(agent_id, fn)
+    else:
+        env = Env(env_conf)
 
     if save_imgs:
         # save images
@@ -131,7 +136,7 @@ def evaluate_on_ablation(agent,
                             speed=gif_speed,
                             max_size=img_size)
 
-    # run evaluation metrics
+    # run evaluation metrics, using the sampler functions we have set above
     metrics = dict((metric, []) for metric in infos + ["reward"])
     for i in range(0, 30):
         game_data = playthrough_simple(lambda a: agent, env, env_conf, save_img=False)

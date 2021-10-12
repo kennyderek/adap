@@ -85,7 +85,7 @@ if __name__ == "__main__":
     agent = trainer_cls(trainer_conf)
     agent.restore(last_checkpoint)
 
-    ablation_results = {} 
+    ablation_results = {}
     if not os.path.isdir("trials/"):
         os.mkdir("trials/")
     os.mkdir("trials/{}".format(trial_name))
@@ -101,6 +101,28 @@ if __name__ == "__main__":
                                             img_size=200,
                                             infos=["avc", "avt", "c_t_attacktropy"])
         ablation_results[title] = eval_metrics
+
+    title = "train_no_evo"
+    ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
+    eval_metrics = evaluate_on_ablation(agent,
+                                        Env,
+                                        args.env_conf,
+                                        ablation_eval_name,
+                                        eval_steps=0,
+                                        img_size=200,
+                                        infos=["avc", "avt", "c_t_attacktropy"])
+    ablation_results[title] = eval_metrics
+
+    title = "train_with_evo"
+    ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
+    eval_metrics = evaluate_on_ablation(agent,
+                                        Env,
+                                        args.env_conf,
+                                        ablation_eval_name,
+                                        eval_steps=30 if args.test_mode else 200,
+                                        img_size=200,
+                                        infos=["avc", "avt", "c_t_attacktropy"])
+    ablation_results[title] = eval_metrics
 
     # record ablation metrics to file
     with open("trials/{}/{}_metrics.json".format(trial_name, trial_name), 'w+') as f:
