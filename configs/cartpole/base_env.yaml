@@ -4,7 +4,7 @@ discrete_context: false
 env: Gym
 game: CartPole-v0
 max_env_actions: 1
-mode: cartpole_right
+mode: normal
 noise_scale: 0.0
 use_context: true
 eps_length: 200

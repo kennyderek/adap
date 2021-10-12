@@ -1,10 +1,9 @@
 from os import name
-from adapenvs.farmworld.farmworld import Farmworld
+#from adapenvs.farmworld.farmworld import Farmworld
 from adapenvs.field.field import Field
 from adapenvs.markov_soccer.markov_soccer import MarkovSoccer
+from adapenvs.farmworld.farmworld import Farmworld
 from adapenvs.gym_wrapper.gym_wrapper import GymWrapper
-
-from adapenvs.simulators.simulation import simulate_field_with_context, step_farm_with_context, simulate_gym
 
 from adap.policies.trainers import MyCallbacksFarm, MyCallbacksField, MyCallbacksSoccer
 from ray.rllib.agents.callbacks import DefaultCallbacks
@@ -31,10 +30,27 @@ from adap.models.concat_model import ConcatModel
 from adap.models.mult_model import MultModel
 from ray.rllib.models import ModelCatalog
 ModelCatalog.register_custom_model(
-    "ContextConcat", ConcatModel)
+    "concat", ConcatModel)
 ModelCatalog.register_custom_model(
-    "ContextMult", MultModel)
+    "mult", MultModel)
 
+import gym
+
+from adapenvs.latent_env_wrapper import LatentWrapper
+
+from ray.rllib.env.multi_agent_env import MultiAgentEnv
+
+class FarmworldWrapped(LatentWrapper, MultiAgentEnv):
+
+    def __init__(self, config):
+        env = Farmworld(config)
+        super().__init__(env)
+
+class GymWrapped(LatentWrapper, MultiAgentEnv):
+
+    def __init__(self, config):
+        env = GymWrapper(config)
+        super().__init__(env)
 
 def get_name_creator(path, name=""):
     def name_creator(trial):
@@ -66,19 +82,17 @@ def get_trainer(args_trainer):
     )
     return Trainer
 
-
 def get_env_and_callbacks(env_name):
     if env_name == "Farmworld":
-        return Farmworld, MyCallbacksFarm, step_farm_with_context, set_latent_farmworld
+        return FarmworldWrapped, MyCallbacksFarm
     if env_name == "Field":
-        return Field, MyCallbacksField, simulate_field_with_context
+        return Field, DefaultCallbacks
     if env_name == "MarkovSoccer":
-        return MarkovSoccer, MyCallbacksSoccer, None
+        return MarkovSoccer, DefaultCallbacks
     if env_name == "Gym":
-        return GymWrapper, DefaultCallbacks, simulate_gym, set_latent_gym
+        return GymWrapped, DefaultCallbacks
     else:
         assert False, "improper env choice"
-
 
 def build_trainer_config(env_class,
                          callback_class,

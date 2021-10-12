@@ -1,20 +1,15 @@
 import json
 import random
-from datetime import datetime
-from statistics import median
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple
 from copy import copy
 import copy
 
-import gym
 from gym import spaces
 import numpy as np
 from adapenvs.farmworld.agent import Agent
 from adapenvs.farmworld.tower import Tower
 from adapenvs.farmworld.chicken import Chicken
 from adapenvs.farmworld.wall import Wall
-# from context.envs.farmworld.grenade import Grenade
-# from context.envs.farmworld.cake import Cake
 
 from adapenvs.farmworld.unit import Unit
 from adapenvs.farmworld.utilities import (get_image_and_mask,
@@ -24,13 +19,9 @@ from gym.spaces import Box, Discrete, MultiDiscrete
 from gym.spaces import Tuple as TupleSpace
 from PIL import Image, ImageDraw, ImageFont
 
-from ray.rllib.env import MultiAgentEnv
-
 from collections import OrderedDict
 
-from adapenvs.utils.context_sampler import SAMPLERS
-
-class Farmworld(MultiAgentEnv):
+class Farmworld():
 
     UP = 0
     DOWN = 1
@@ -46,28 +37,25 @@ class Farmworld(MultiAgentEnv):
     encoding_width = 1
 
     def __init__(self, config):
+        self.config = config
 
         # initialize constant variables
         self.max_agent_health = config.get("max_agent_health", 20)
         self.max_tower_health = config.get("max_tower_health", 1)
         self.max_chicken_health = config.get("max_chicken_health", 1)
         self.agent_view_range = config.get("agent_view_range", 2)
-        self.context_size = config.get("context_size", 4)
-        # self.discrete_context = config.get("discrete_context", False)
         self.agent_payoff = config.get('agent_payoff', 0)
-        self.tower_payoff = config.get('tower_payoff', 0)
-        self.chicken_payoff = config.get('chicken_payoff', 0)
+        self.tower_payoff = config.get('tower_payoff', 5)
+        self.chicken_payoff = config.get('chicken_payoff', 5)
         self.ava_damage = config.get('ava_damage', 0) # agent vs. agent damage
         self.use_specialization = config.get("use_specialization", False)
         self.use_pixels = config.get("use_pixels", False)
         self.map = config.get("map", [])
-        self.action_space = Discrete(config.get("max_env_actions"))
-        self.eps_length = config["eps_length"]
-        self.use_context = config["use_context"]
-        self.config = config
-        self.context_sampler = config.get("context_sampler", "l2")
+        
+        self.action_space = Discrete(config.get("max_env_actions", 6))
+        assert config.get("max_env_actions", 6) == 6, "should be 6 actions but is {}".format(config.get("max_env_actions", 6))
 
-        assert config.get("max_env_actions") == 6, "should be 5 actions but is {}".format(config.get("max_env_actions"))
+        self.eps_length = config.get("eps_length", 100)
         
         if self.map != []:
             self.sidelength_y = len(self.map)
@@ -86,13 +74,13 @@ class Farmworld(MultiAgentEnv):
                         num_towers += 1
                     elif self.map[row][col] == "w":
                         num_walls += 1
-            self.original_num_agents = config.get("num_agents", 1)
+            self.original_num_agents = num_agents
             self.num_agents = self.original_num_agents
             self.num_chickens = num_chickens
             self.num_towers = num_towers
             self.num_walls = num_walls
         else:
-            self.original_num_agents = config.get("num_agents", 1)
+            self.original_num_agents = config.get("num_agents", 2)
             self.num_agents = self.original_num_agents
             self.num_chickens = config.get("num_chickens", 0)
             self.sidelength_x = config.get("sidelength_x", 5)
@@ -121,16 +109,8 @@ class Farmworld(MultiAgentEnv):
             
             num_cells = (self.agent_view_range*2+1) ** 2
             obs_dim = num_cells * cell_encoding_dim
-            # self.observation_space = Box(0, 1, shape=(obs_dim,), dtype=np.float)
-            if self.use_context:
-                self.observation_space = spaces.Dict({
-                    "ctx": Box(-1, 1, (self.context_size,)),
-                    "obs": Box(0, 1, shape=(obs_dim,), dtype=np.float)
-                })
-            else:
-                self.observation_space = spaces.Dict({
-                    "obs": Box(0, 1, shape=(obs_dim,), dtype=np.float)
-                })
+            self.observation_space = Box(0, 1, shape=(obs_dim,), dtype=np.float)
+
 
         self.reset()
 
@@ -147,9 +127,7 @@ class Farmworld(MultiAgentEnv):
             self.agents[agent_id] = Agent(self,
                     max_health=self.max_agent_health,
                     location=None,
-                    origin_time=0,
-                    context_size=self.context_size,
-                    context=SAMPLERS[self.context_sampler](self.context_size, 1)[0])
+                    origin_time=0)
         
         for _ in range(self.num_towers):
             self.towers.append(Tower(self, self.max_tower_health))
@@ -158,7 +136,7 @@ class Farmworld(MultiAgentEnv):
             self.chickens.append(Chicken(self, self.max_chicken_health))
 
     def assign_by_map(self):
-        agent_id = 0
+        agent_id = 1
         for row in range(len(self.map)):
             for col in range(len(self.map[row])):
                 if self.map[row][col] == "c":
@@ -167,16 +145,14 @@ class Farmworld(MultiAgentEnv):
                     self.agents[agent_id] = Agent(self,
                             max_health=self.max_agent_health,
                             location=(row, col),
-                            origin_time=0,
-                            context_size=self.context_size,
-                            context=SAMPLERS[self.context_sampler](self.context_size, 1)[0])
+                            origin_time=0)
                     agent_id += 1
                 elif self.map[row][col] == "t":
                     self.towers.append(Tower(self, self.max_tower_health, loc=(row, col)))
                 elif self.map[row][col] == "w":
                     self.walls.append(Wall(self, loc=(row, col)))
 
-    def reset(self, pixel_viz=False):
+    def reset(self):
         self.available_locs : Set[Tuple[int, int]] = set([(j, i) for i in range(self.sidelength_x) for j in range(self.sidelength_y)])
         # print(self.available_locs)
         self.step_num = 0
@@ -194,21 +170,17 @@ class Farmworld(MultiAgentEnv):
             self.assign_by_map()
         self.dead_agents = [] # for keeping track of agents that are gone
 
-        if pixel_viz:
-            self.pixel_viz = True
-        if self.pixel_viz or self.use_pixels:
-            self.base_map_img = np.zeros((self.sidelength_y * Farmworld.sprite_width, self.sidelength_x * Farmworld.sprite_width, 4), dtype=np.uint8)
-        else:
-            self.base_map_enc = np.zeros((self.sidelength_y * self.sprite_width, self.sidelength_x * self.sprite_width, 6), dtype=np.float)
-        if self.use_pixels or self.pixel_viz:
-            # draw the grassy texture
-            for i in range(self.sidelength_x):
-                for j in range(self.sidelength_y):
-                    x1, x2 = i * Farmworld.sprite_width, (i + 1) * Farmworld.sprite_width
-                    y1, y2 = j * Farmworld.sprite_width, (j + 1) * Farmworld.sprite_width
-                    temp = random.choice([self.base_img1, self.base_img2])
-                    self.base_map_img[y1:y2,x1:x2,:] = temp
-            self.last_img = copy.deepcopy(self.base_map_img)
+        self.base_map_img = np.zeros((self.sidelength_y * Farmworld.sprite_width, self.sidelength_x * Farmworld.sprite_width, 4), dtype=np.uint8)
+        # draw the grassy texture
+        for i in range(self.sidelength_x):
+            for j in range(self.sidelength_y):
+                x1, x2 = i * Farmworld.sprite_width, (i + 1) * Farmworld.sprite_width
+                y1, y2 = j * Farmworld.sprite_width, (j + 1) * Farmworld.sprite_width
+                temp = random.choice([self.base_img1, self.base_img2])
+                self.base_map_img[y1:y2,x1:x2,:] = temp
+        self.last_img = copy.deepcopy(self.base_map_img)
+
+        self.base_map_enc = np.zeros((self.sidelength_y * self.sprite_width, self.sidelength_x * self.sprite_width, 6), dtype=np.float)
 
         return self._obs()
 
@@ -239,7 +211,6 @@ class Farmworld(MultiAgentEnv):
         info['avc'] = agent.chicken_attacks
         info['ava'] = agent.agent_attacks
         info['lifetime'] = self.step_num - agent.origin_time
-        info['context'] = agent.context
         return info
 
     def _obs(self) -> Dict[int, np.ndarray]:
@@ -258,18 +229,10 @@ class Farmworld(MultiAgentEnv):
         obs = {}
         for agent_id in self.agents:
             transform = lambda obs: obs.flatten()
-
-            dict_kvs = []
-            if self.use_context:
-                dict_kvs.append(("ctx", self.agents[agent_id].get_context()))
-            dict_kvs.append(("obs", transform(
-                        self.agents[agent_id].get_obs(
+            agent_obs = transform(self.agents[agent_id].get_obs(
                                         board, self.agent_view_range,
-                                        self.sprite_width
-                                    )
-                    )
-            ))
-            obs[agent_id] = OrderedDict([*dict_kvs])
+                                        self.sprite_width))
+            obs[agent_id] = agent_obs
         return obs
 
     def step(self, actions : Dict[int, int]):
@@ -344,7 +307,7 @@ class Farmworld(MultiAgentEnv):
         #
         rewards = {agent_id:self.agents[agent_id].reward for agent_id in self.agents}
         dones = {}
-        infos = {agent_id:{'ctx': self.agents[agent_id].context} for agent_id in self.agents}
+        infos = {}
         obs = self._obs()
 
         # clear remove agents & chickens that have died
@@ -401,23 +364,19 @@ class Farmworld(MultiAgentEnv):
             x1, x2 = l[0] * Farmworld.sprite_width + padding, (l[0] + 1) * Farmworld.sprite_width + padding
             y1, y2 = l[1] * Farmworld.sprite_width + padding, (l[1] + 1) * Farmworld.sprite_width + padding
             layer_two_images_fast(offset_img[x1:x2,y1:y2,:], unit.get_img_rep().view())
-        
-        # offset_img = self.last_img.astype(np.float32)*0.30 + offset_img[padding:padded_sidelength[0]-padding,padding:padded_sidelength[1]-padding,:].astype(np.float32)*0.65 + self.base_map_img.astype(np.float32)*0.05
-        # self.last_img = copy.deepcopy(offset_img)
 
         offset_img = offset_img.astype(np.uint8)
-        # return offset_img[...,0:3].view()
 
-        size = 500
-        scale_y = int(size * 5 / 5)
-        scale_x = int(size * 4 / 5)
-        img = Image.fromarray(offset_img[...,0:3].view()).resize((scale_y, scale_x), Image.NEAREST)
+        # size = 500
+        # scale_y = int(size * 5 / 5)
+        # scale_x = int(size * 4 / 5)
+        # img = Image.fromarray(offset_img[...,0:3].view()).resize((scale_y, scale_x), Image.NEAREST)
 
-        draw = ImageDraw.Draw(img)
-        font = ImageFont.truetype(str(get_resource_path_string("arial.ttf")), 35)
+        # draw = ImageDraw.Draw(img)
+        # font = ImageFont.truetype(str(get_resource_path_string("arial.ttf")), 35)
+        # draw.text((4, 4),"Number of agent `blunders':" + str(self.num_errors), (0,0,255), font=font)
 
-        draw.text((4, 4),"Number of agent `blunders':" + str(self.num_errors), (0,0,255), font=font)
+        return offset_img[...,0:3]
 
-
-        return np.array(img)
-
+    def render(self):
+        return self.get_world_map()

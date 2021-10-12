@@ -3,5 +3,4 @@ ray
 ray[rllib]
 adapenvs
 torch
-tensorflow
 pyglet

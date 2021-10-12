@@ -2,3 +2,4 @@
 *.png
 *.gif
 *.DS_Store
+scripts/trials/*

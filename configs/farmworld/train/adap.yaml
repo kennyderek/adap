@@ -1,5 +1,5 @@
 hidden_dim: 64
-timesteps_total: 6_000_000
+timesteps_total: 6_00
 training_iteration: 10_000
 
 context_loss_coeff: 0.2

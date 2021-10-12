@@ -1,9 +1,9 @@
-ablation_name: "PoisonChickens"
+ablation_name: Patience
 evolve_steps: 400
 
 # common configs
 env: "Farmworld"
-eps_length: 100
+eps_length: 200
 max_env_actions: 6
 context_size: 3
 use_context: true
@@ -12,24 +12,24 @@ discrete_context: false
 # env specific
 num_agents: 1
 num_towers: 2
-num_chickens: 2
-sidelength_x: 5
-sidelength_y: 5
+num_chickens: 0
+sidelength_x: 2
+sidelength_y: 2
 
-max_agent_health: 25
+max_agent_health: 20
 max_tower_health: 1
 max_chicken_health: 2
 
 chicken_move_prob: 0.0
 
-chicken_cooldown: 2
-tower_cooldown: 2
+chicken_cooldown: 200
+tower_cooldown: 30
 
 ava_damage: 0
 
 agent_payoff: 0
-tower_payoff: 10
-chicken_payoff: -15
+tower_payoff: 20
+chicken_payoff: 0
 
 channels_first: true
 use_pixels: false

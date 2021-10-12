@@ -1,33 +1,22 @@
-env_conf:
-  action_dist: gaussian
-  context_size: 3
-  discrete_context: false
-  env: Gym
-  game: CartPole-v0
-  max_env_actions: 1
-  mode: normal
-  noise_scale: 0.0
-  use_context: true
-training_conf:
-  batch_mode: complete_episodes
-  clamp_mu_logits: true
-  context_loss_coeff: 0.1
-  count_steps_by: agent_steps
-  entropy_coeff: 0.0
-  hidden_dim: 16
-  lr: 0.0003
-  lstm_state_size: 16
-  model: ContextMult
-  num_context_samples: 4
-  num_sgd_iter: 10
-  num_state_samples: 15
-  rollout_fragment_length: 800
-  sgd_minibatch_size: 400
-  timesteps_total: 100_000
-  train_batch_size: 4000
-  trainer: Context
-  training_iteration: 10000
-  use_mi_discrim: false
-  use_value_bias: false
-  value_nonlinearity: ReLU
-  vf_loss_coeff: 1
+batch_mode: complete_episodes
+clamp_mu_logits: true
+context_loss_coeff: 0.1
+count_steps_by: agent_steps
+entropy_coeff: 0.0
+hidden_dim: 16
+lr: 0.0003
+lstm_state_size: 16
+model: ContextMult
+num_context_samples: 4
+num_sgd_iter: 10
+num_state_samples: 15
+rollout_fragment_length: 800
+sgd_minibatch_size: 400
+timesteps_total: 100
+train_batch_size: 4000
+trainer: Context
+training_iteration: 10000
+use_mi_discrim: false
+use_value_bias: false
+value_nonlinearity: ReLU
+vf_loss_coeff: 1

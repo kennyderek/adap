@@ -39,9 +39,7 @@ class Agent(Unit):
             farmworld,
             max_health : int,
             location:Union[None, Tuple[int, int]] = None,
-            origin_time=0,
-            context_size=0,
-            context = None):
+            origin_time=0):
         self._max_health = max_health
         self._health = self._max_health
 
@@ -55,21 +53,6 @@ class Agent(Unit):
             self._location : np.ndarray = farmworld.pop_available_xy_coord()
 
         self.origin_time = origin_time
-
-        # self.context = np.random.randint(0, 2, size=(context_size,)) * 2 - 1 # sample from {-1, 1}!
-
-        # self.context = np.random.rand(context_size)
-
-        # UNIT norm context
-        if not isinstance(context, np.ndarray):
-            if farmworld.discrete_context:
-                self.context = np.zeros(context_size)
-                self.context[random.randint(0, context_size-1)] = 1
-            else:
-                self.context = np.random.rand(context_size) * 2 - 1
-                self.context = self.context / np.sum((self.context)**2)**(1/2)
-        else:
-            self.context = context
 
         self.reward = 0
         self.done = False
@@ -94,9 +77,6 @@ class Agent(Unit):
         self.tower_attacks = 0
         self.agent_attacks = 0
         self.lifetime = 0
-
-    def get_context(self):
-        return self.context
 
     def get_square_infront(self) -> Tuple[int, int]:
         '''
@@ -222,9 +202,6 @@ class Agent(Unit):
         idx = self.orientation * num_non_rotated + idx
 
         agent_img = copy.deepcopy(Agent.all_agent_imgs[idx])
-
-        # if self.visualize_context:
-        # assert False, "TODO! visualize context for pixels"
 
         if self.tower_damage != 0 or self.chicken_damage != 0:
             box = np.zeros((9, 9, 4), dtype=np.uint8)
