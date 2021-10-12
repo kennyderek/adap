@@ -1,5 +1,5 @@
 hidden_dim: 64
-timesteps_total: 6_000_000
+timesteps_total: 30_000_000
 training_iteration: 10_000
 
 context_loss_coeff: 1 # 1 is fine, since this updates the discrim network, which is separate

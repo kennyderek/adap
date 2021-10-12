@@ -95,7 +95,12 @@ def get_mean_agent_reward(game_data):
 def get_mean_info_metric(game_data, info_metric):
     info = []
     for agent_id, agent_dict in game_data.items():
-        info.append(sum(agent_dict['infos'][info_metric]))
+        info_for_agent = []
+        for info_at_step in agent_dict['infos']:
+            if info_metric in info_at_step:
+                info_for_agent.append(info_at_step[info_metric])
+
+        info.append(sum(info_for_agent))
     return np.mean(info)
 
 def evaluate_on_ablation(agent,

@@ -174,8 +174,8 @@ def build_trainer_config(env_class,
         "grad_clip": None if trainer_conf.get('grad_clip', 0.5) == "None" else trainer_conf.get('grad_clip', 0.5),
         "lr": trainer_conf.get('lr', 3e-4),
 
-        "train_batch_size": trainer_conf.get('train_batch_size', 4000),
-        "sgd_minibatch_size": trainer_conf.get('sgd_minibatch_size', 2000),
+        "train_batch_size": trainer_conf.get('train_batch_size', 8000),
+        "sgd_minibatch_size": trainer_conf.get('sgd_minibatch_size', 8000),
         "num_sgd_iter": trainer_conf.get("num_sgd_iter", 10),
 
         "framework": "torch",

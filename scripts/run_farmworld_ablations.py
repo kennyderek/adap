@@ -35,6 +35,8 @@ parser.add_argument("--model", type=str, default="mult", help="model to use, in 
 
 parser.add_argument('--restore', type=str, default="", help="")
 
+parser.add_argument('--test-mode', action="store_true", help="run a shortened versioon of this, to test for bugs")
+
 if __name__ == "__main__":
     args = parser.parse_args()
     path = args.train_conf.split("/")
@@ -55,7 +57,7 @@ if __name__ == "__main__":
     trainer_conf = build_trainer_config(Env, callbacks, env_conf, training_conf, obs_space, act_space)
 
     stop = {
-        "timesteps_total": training_conf['timesteps_total'],
+        "timesteps_total": training_conf['timesteps_total'] if not args.test_mode else 100,
         "training_iteration": training_conf['training_iteration'],
     }
 
@@ -87,7 +89,7 @@ if __name__ == "__main__":
     if not os.path.isdir("trials/"):
         os.mkdir("trials/")
     os.mkdir("trials/{}".format(trial_name))
-    
+
     for ablation_path in ABLATIONS_PATHS:
         title = ablation_path.split("/")[-1].replace(".yaml", "")
         ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
@@ -95,8 +97,9 @@ if __name__ == "__main__":
                                             Env,
                                             ablation_path,
                                             ablation_eval_name,
-                                            eval_steps=30,
-                                            img_size=200)
+                                            eval_steps=30 if args.test_mode else 200,
+                                            img_size=200,
+                                            infos=["avc", "avt", "c_t_attacktropy"])
         ablation_results[title] = eval_metrics
 
     # record ablation metrics to file
