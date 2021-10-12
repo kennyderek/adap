@@ -26,7 +26,7 @@ ABLATIONS_PATHS = [BASE_ABLATION_PATH + "far_corner.yaml",
 parser = argparse.ArgumentParser(description='Process some integers.')
 
 parser.add_argument('--local-dir', type=str, default="~/ray_results")
-parser.add_argument('--exp-name', type=str, default="context_exp", help="name of these experiments, will be a subdirectory of --local-dir")
+parser.add_argument('--exp-name', type=str, default="exp", help="name of these experiments, will be a subdirectory of --local-dir")
 parser.add_argument('--trial-name', type=str, default="", help="name of this specific seed, if empty will append the timestap to the .yaml name")
 
 parser.add_argument('--env-conf', type=str, help="path to config file of train environment")
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         ray.init()
     
     # e.g. We want adap_10_19_36_03 from .../ray_results/context_exp/adap_10_19_36_03/checkpoint_000001/checkpoint-1
-    trial_name = last_checkpoint.split("/")[-3]
+    trial_name = last_checkpoint.split("/")[-3] + "_" + args.exp_name
 
     agent = trainer_cls(trainer_conf)
     agent.restore(last_checkpoint)
