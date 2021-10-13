@@ -52,12 +52,9 @@ class GymWrapped(LatentWrapper, MultiAgentEnv):
         env = GymWrapper(config)
         super().__init__(env)
 
-def get_name_creator(path, name=""):
+def get_name_creator(name=""):
     def name_creator(trial):
-        if name == "":
-            return path[-1].replace(".yaml", "") + \
-                datetime.now().strftime("_%d_%H_%M_%S")
-        return name
+        return "{}{}_{}".format(name, str(trial)[-1], datetime.now().strftime("%d_%H_%M_%S"))
     return name_creator
 
 def get_trainer(args_trainer):

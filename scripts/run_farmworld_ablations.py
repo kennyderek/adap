@@ -10,6 +10,11 @@ from adapenvs.latent_env_wrapper import LatentWrapper
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from adap.policies.trainers import MyCallbacksFarm
 
+from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.tune.syncer import SyncerCallback
+
+os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
+
 class FarmworldWrapped(LatentWrapper, MultiAgentEnv):
 
     def __init__(self, config):
@@ -71,59 +76,61 @@ if __name__ == "__main__":
             checkpoint_at_end=True,
             local_dir=args.local_dir, # defaults to ~/ray_results
             name=args.exp_name, # the dir name after ~/ray_results
-            trial_dirname_creator=get_name_creator(path, args.trial_name), # the name after ~/ray_results/context_exp
+            trial_dirname_creator=get_name_creator(args.exp_name), # the name after ~/ray_results/context_exp
+            num_samples=1 # passing empty list disables logging callbacks to save on memory
         )
-        last_checkpoint = exp.get_last_checkpoint()
+        last_checkpoints = [exp.get_last_checkpoint(trial) for trial in exp.trials]
     else:
-        last_checkpoint = args.restore
+        last_checkpoints = [args.restore]
         import ray
         ray.init()
-    
-    # e.g. We want adap_10_19_36_03 from .../ray_results/context_exp/adap_10_19_36_03/checkpoint_000001/checkpoint-1
-    trial_name = last_checkpoint.split("/")[-3] + "_" + args.exp_name
 
-    agent = trainer_cls(trainer_conf)
-    agent.restore(last_checkpoint)
+    for last_checkpoint in last_checkpoints:
+        # e.g. We want adap_10_19_36_03 from .../ray_results/context_exp/adap_10_19_36_03/checkpoint_000001/checkpoint-1
+        trial_name = last_checkpoint.split("/")[-3] + "_" + args.exp_name
 
-    ablation_results = {}
-    if not os.path.isdir("trials/"):
-        os.mkdir("trials/")
-    os.mkdir("trials/{}".format(trial_name))
+        agent = trainer_cls(trainer_conf)
+        agent.restore(last_checkpoint)
 
-    for ablation_path in ABLATIONS_PATHS:
-        title = ablation_path.split("/")[-1].replace(".yaml", "")
+        ablation_results = {}
+        if not os.path.isdir("trials/"):
+            os.mkdir("trials/")
+        os.mkdir("trials/{}".format(trial_name))
+
+        for ablation_path in ABLATIONS_PATHS:
+            title = ablation_path.split("/")[-1].replace(".yaml", "")
+            ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
+            eval_metrics = evaluate_on_ablation(agent,
+                                                Env,
+                                                ablation_path,
+                                                ablation_eval_name,
+                                                eval_steps=30 if args.test_mode else 200,
+                                                img_size=200,
+                                                infos=["avc", "avt", "c_t_attacktropy"])
+            ablation_results[title] = eval_metrics
+
+        title = "train_no_evo"
         ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
         eval_metrics = evaluate_on_ablation(agent,
                                             Env,
-                                            ablation_path,
+                                            args.env_conf,
+                                            ablation_eval_name,
+                                            eval_steps=0,
+                                            img_size=200,
+                                            infos=["avc", "avt", "c_t_attacktropy"])
+        ablation_results[title] = eval_metrics
+
+        title = "train_with_evo"
+        ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
+        eval_metrics = evaluate_on_ablation(agent,
+                                            Env,
+                                            args.env_conf,
                                             ablation_eval_name,
                                             eval_steps=30 if args.test_mode else 200,
                                             img_size=200,
                                             infos=["avc", "avt", "c_t_attacktropy"])
         ablation_results[title] = eval_metrics
 
-    title = "train_no_evo"
-    ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
-    eval_metrics = evaluate_on_ablation(agent,
-                                        Env,
-                                        args.env_conf,
-                                        ablation_eval_name,
-                                        eval_steps=0,
-                                        img_size=200,
-                                        infos=["avc", "avt", "c_t_attacktropy"])
-    ablation_results[title] = eval_metrics
-
-    title = "train_with_evo"
-    ablation_eval_name = "trials/{}/{}_{}".format(trial_name, trial_name, title)
-    eval_metrics = evaluate_on_ablation(agent,
-                                        Env,
-                                        args.env_conf,
-                                        ablation_eval_name,
-                                        eval_steps=30 if args.test_mode else 200,
-                                        img_size=200,
-                                        infos=["avc", "avt", "c_t_attacktropy"])
-    ablation_results[title] = eval_metrics
-
-    # record ablation metrics to file
-    with open("trials/{}/{}_metrics.json".format(trial_name, trial_name), 'w+') as f:
-        f.write(json.dumps(ablation_results))
+        # record ablation metrics to file
+        with open("trials/{}/{}_metrics.json".format(trial_name, trial_name), 'w+') as f:
+            f.write(json.dumps(ablation_results))
