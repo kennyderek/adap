@@ -72,7 +72,7 @@ if __name__ == "__main__":
         exp = tune.run(trainer_cls,
             config=trainer_conf,
             stop=stop,
-            checkpoint_freq=1000,
+            checkpoint_freq=10_000,
             checkpoint_at_end=True,
             local_dir=args.local_dir, # defaults to ~/ray_results
             name=args.exp_name, # the dir name after ~/ray_results
@@ -106,7 +106,8 @@ if __name__ == "__main__":
                                                 ablation_eval_name,
                                                 eval_steps=30 if args.test_mode else 200,
                                                 img_size=200,
-                                                infos=["avc", "avt", "c_t_attacktropy"])
+                                                infos=["avc", "avt", "c_t_attacktropy"],
+                                                save_imgs=False)
             ablation_results[title] = eval_metrics
 
         title = "train_no_evo"
@@ -117,7 +118,8 @@ if __name__ == "__main__":
                                             ablation_eval_name,
                                             eval_steps=0,
                                             img_size=200,
-                                            infos=["avc", "avt", "c_t_attacktropy"])
+                                            infos=["avc", "avt", "c_t_attacktropy"],
+                                            save_imgs=False)
         ablation_results[title] = eval_metrics
 
         title = "train_with_evo"
@@ -128,7 +130,8 @@ if __name__ == "__main__":
                                             ablation_eval_name,
                                             eval_steps=30 if args.test_mode else 200,
                                             img_size=200,
-                                            infos=["avc", "avt", "c_t_attacktropy"])
+                                            infos=["avc", "avt", "c_t_attacktropy"],
+                                            save_imgs=False)
         ablation_results[title] = eval_metrics
 
         # record ablation metrics to file
